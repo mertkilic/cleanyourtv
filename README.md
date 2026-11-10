@@ -2,6 +2,60 @@
   <a href="https://cleanyour.tv"><img src="https://raw.githubusercontent.com/Gathin23/cleanyourtv/main/docs/banner.png" alt="CleanYourTV. Your TV, minus the ads. Strip the bloatware from any Android TV or Google TV over Wi-Fi and replace the ad-filled home screen with a clean launcher that looks like an Apple TV. No root, no cable, nothing uninstalled, and a one-line restore." width="800"></a>
 </p>
 
+> [!NOTE]
+> **This is a fork of [Gathin23/cleanyourtv](https://github.com/Gathin23/cleanyourtv)** with a trending-titles
+> carousel on Home and a few look changes, built and tested on a Sony BRAVIA (Google TV 14). Everything below the
+> next section is the upstream README and still applies: the debloat tools, the safety rules and the restore path
+> are unchanged. Unlike upstream, this launcher **uses the internet** (TMDB and, optionally, Trakt) and Kotlin +
+> Jetpack Compose, so it is about 1.8 MB instead of 576 KB.
+
+## What this fork adds
+
+| Change | What it does | Setting (`launcher/app/src/main/res/values/config.xml`) |
+|---|---|---|
+| **Trending carousel** | A full-width slideshow above the dock with the movies and series people are watching now: backdrop, title logo, year, rating, genres, overview. Up from the dock selects it; Left/Right flip, Down returns. The artwork fades under the app icons into the poster's own average colour. | `hero_pager`, `hero_pager_seconds` (8), `hero_pager_language` (`en-US`) |
+| **Once-a-day fetching** | TMDB and Trakt are asked at most once per calendar day (the TV's clock); the rest of the day Home shows the cached feed, also offline. A failed fetch waits an hour before the next try. | built in |
+| **Search in TiviMate** | OK on a slide opens [TiviMate](https://play.google.com/store/apps/details?id=ar.tvplayer.tv) and types the title into its search, with an optional accessibility helper that reads TiviMate's screens only, for a few seconds after OK. Without the helper, TiviMate opens with the title on the clipboard. | `hero_pager_target` (`ar.tvplayer.tv`) |
+| **Round app icons** | Tiles are the apps' own icons (loaded at the highest resolution they ship) on round cards, six per row, with no band behind the dock. | `uniform_tiles`, `square_tiles`, `circle_tiles`, `columns`, `dock_band`, `dock_opacity` |
+| **Your name in the greeting** | "GOOD AFTERNOON, ALEX". Android does not let a launcher read the Google account's name, so set it here. | `greeting_name` |
+
+### Set up your API keys
+
+The keys are built into your APK from `launcher/local.properties`, which git ignores, so they never end up in a
+commit. Create the file (or add to it):
+
+```properties
+# Required: TMDB "API Read Access Token" (themoviedb.org > Settings > API). The shorter v3 "API Key" works too.
+tmdb.token=eyJhbGciOi...
+# Optional: Trakt "Client ID" (trakt.tv/oauth/applications > New application). Ranks titles by people
+# watching right now; without it the carousel uses TMDB's trending of the week.
+trakt.clientId=
+```
+
+Without a TMDB token the carousel stays hidden and Home looks like upstream's. Rebuild after changing a key.
+TMDB asks apps to credit it, which the carousel does ("Data: TMDB"); this product uses the TMDB API but is not
+endorsed or certified by TMDB.
+
+### Build and install
+
+Same as upstream (JDK 17, Android SDK 34), plus one optional switch for the TiviMate search helper:
+
+```bash
+cd launcher
+TV_HOST=<tv ip> SEARCH_HANDOFF_SERVICE=1 ./build-and-install.sh
+```
+
+On a set whose only network ADB is Wireless debugging, pair once with Google's `adb` and add
+`TV_ADB_BINARY=$(which adb) TV_HOST=<tv ip>:<port>` ([tools/native-adb.md](tools/native-adb.md)). Android turns
+accessibility helpers off whenever the launcher is reinstalled or force-stopped; run the install with
+`SEARCH_HANDOFF_SERVICE=1` again, or switch on "Home: search in TiviMate" in Settings > Accessibility.
+
+**Sony BRAVIA on Google TV 14:** the setup wizard (`com.google.android.tungsten.setupwraith`) also claims Home, so
+disable it before the stock launcher, as [examples/sony-bravia-ae2](examples/sony-bravia-ae2/debloat.txt) says. First
+check it does not own your Wi-Fi network (`dumpsys wifi | grep -o 'cname=[^ ]*'`), or the TV goes offline.
+
+---
+
 <p align="center">
   Read in: <a href="README.he.md" lang="he" dir="rtl">עברית</a> · <a href="README.zh-CN.md">简体中文</a> · <a href="README.zh-TW.md">正體中文</a> · <a href="README.vi.md">Tiếng Việt</a> · <a href="README.ja.md">日本語</a> · <a href="README.it.md">Italiano</a> · <a href="README.pt-BR.md">Português</a> · <a href="README.nl.md">Nederlands</a> · <a href="README.de.md">Deutsch</a> · <a href="README.uk.md">Українська</a> · <a href="README.tr.md">Türkçe</a> · <a href="README.uz.md">Oʻzbekcha</a>
 </p>

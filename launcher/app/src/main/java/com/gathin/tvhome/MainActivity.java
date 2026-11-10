@@ -1,8 +1,8 @@
 package com.gathin.tvhome;
 
 import android.animation.ArgbEvaluator;
+import android.annotation.SuppressLint;
 import android.animation.ValueAnimator;
-import android.app.Activity;
 import android.app.Dialog;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
@@ -70,12 +70,16 @@ import android.widget.PopupWindow;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.ComponentActivity;
 import androidx.annotation.NonNull;
+import androidx.compose.ui.platform.ComposeView;
 import androidx.dynamicanimation.animation.FloatPropertyCompat;
 import androidx.dynamicanimation.animation.SpringAnimation;
 import androidx.dynamicanimation.animation.SpringForce;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.gathin.tvhome.hero.HeroBridge;
 
 import java.io.File;
 import java.io.IOException;
@@ -94,7 +98,7 @@ import java.util.Set;
 /**
  * tvOS style home: black, a pinned dock row, an app grid, and one glass highlight that springs between tiles.
  */
-public class MainActivity extends Activity implements AppAdapter.TileListener {
+public class MainActivity extends ComponentActivity implements AppAdapter.TileListener {
     @Override
     protected void attachBaseContext(android.content.Context base) {
         super.attachBaseContext(LauncherLocale.wrap(base));   // locale
@@ -202,6 +206,43 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private TextView raceKicker, raceHeadline, raceSessions;
     /** game_day: each team's next game from an add-on, rotating in the race panel; null when the key is off. */
     private GameDay gameDay;
+    /** hero_pager: the trending carousel above the dock, or null when it is off or has no TMDB token. */
+    private HeroBridge heroBridge;
+    /** dock_title, kept so the app name above the dock comes back if the carousel goes away. */
+    private boolean dockTitleShown = true;
+    private final HeroBridge.Host heroHost = new HeroBridge.Host() {
+        @Override
+        public void heroExitDown() {
+            // Back to the dock app the carousel was entered from (or the first one).
+            int pos = lastFocused;
+            if (pos < 0 || !DockSlots.inDockRow(dockRow, singleRow, pos, COLUMNS)) pos = 0;
+            focusTile(pos);
+        }
+
+        @Override
+        public void heroExitUp() {
+            firstTopButton().requestFocus();
+        }
+
+        @Override
+        public void heroAccent(int color) {
+            if (!ambientGlow) return;
+            if (!animations || reducedMotion || glowSnap) {
+                stopAmbientAnimation();
+                ambient.animate().cancel();
+                setAmbient(color);
+                ambient.setAlpha(1f);
+            } else {
+                transitionAmbient(color);
+            }
+        }
+
+        @Override
+        public void heroShown(boolean shown) {
+            // The carousel's title block sits where the focused app's name would: one or the other.
+            if (dockTitleShown) hero.setVisibility(shown ? View.GONE : View.VISIBLE);
+        }
+    };
     private View raceBar;
     private LinearLayout racePager;
     private long rotationStart;
@@ -477,6 +518,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         settingsKeyPanel = cfg.settingsKeyPanel;
         settingsKeyClearTask = cfg.settingsKeyClearTask;
         COLUMNS = cfg.columns;
+        // square_tiles: square cards (with uniform_tiles, an app icon on a tinted square) instead of 16:9 banners.
+        AppAdapter.circleTiles = getResources().getBoolean(R.bool.circle_tiles);
+        AppAdapter.tileAspect = AppAdapter.circleTiles || getResources().getBoolean(R.bool.square_tiles)
+                ? 1f : AppAdapter.DESIGN_H_DP / AppAdapter.DESIGN_W_DP;
         animations = cfg.animations;
         advancedEffects = cfg.animations && cfg.advancedEffects;
         reducedMotion = cfg.reducedMotion;
@@ -534,7 +579,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         heroMeta = findViewById(R.id.heroMeta);
         heroDots = findViewById(R.id.heroDots);
         heroArt = findViewById(R.id.heroArt);
-        cinematic = cfg.cinematicHome;
+        heroBridge = HeroBridge.attach(this, (ComposeView) findViewById(R.id.heroPager), cfg.backgroundColor,
+                cfg.animations, cfg.reducedMotion, heroHost);
+        // The carousel is the top shelf's backdrop now: the focused app's softened artwork would fight it.
+        cinematic = cfg.cinematicHome && heroBridge == null;
         glowStyle = cfg.glowStyle;
         heroDotsShown = cfg.cinematicDots;
         cinematicWhiteFocus = cfg.cinematicWhiteFocus;
@@ -542,6 +590,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (cinematic) setUpCinematicShelf(cfg.cinematicScrim);
         // dock_title false: the name above the dock (and the cinematic lines under it) never shows; the glow
         // still follows the dock.
+        dockTitleShown = cfg.dockTitle;
         if (!cfg.dockTitle) hero.setVisibility(View.GONE);
         greeting = findViewById(R.id.greeting);
         clockBlock = findViewById(R.id.leftBlock);
@@ -702,6 +751,17 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         Order savedOrder = Order.load(Order.file(this));
         adapter.setSavedOrder(Order.ranks(savedOrder, dockApps), Order.docked(savedOrder, dockApps));
         grid.setAdapter(adapter);
+
+        // hero_pager: the carousel ends its art just under the dock's top and its text just above it.
+        if (heroBridge != null) {
+            final Rect dockLine = new Rect();
+            final Runnable measureDock = () -> {
+                dockLine.set(0, grid.getPaddingTop(), 1, grid.getPaddingTop() + 1);
+                root.offsetDescendantRectToMyCoords(grid, dockLine);
+                heroBridge.setDockTop(dockLine.top);
+            };
+            grid.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> grid.post(measureDock));
+        }
 
         // tvOS layout: push the dock row towards the bottom of the screen, leaving room for
         // rows_below_dock grid rows under it; the rest of the grid stays below until you press Down.
@@ -1361,6 +1421,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         heroArtCache.clear();
         heroArtKey = null;
         wallpaperPlayer.releaseForMemoryPressure();
+        if (heroBridge != null) heroBridge.trimMemory();
         tileRefresh.invalidate();
     }
 
@@ -1428,6 +1489,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * Other keys (volume, Home) pass through; leaving the launcher ends the mode and saves.
      */
     @Override
+    // ComponentActivity (androidx.core) marks its override @RestrictTo; calling super still ends in Activity's dispatch.
+    @SuppressLint("RestrictedApi")
     public boolean dispatchKeyEvent(KeyEvent event) {
         if (homeIgnoreChannelKeys && RemoteKeys.isChannelKey(event.getKeyCode())) return true;
         // Vendor keys (TCL Netflix button, 4062) never reach the key services, only the focused window, so their
@@ -1437,6 +1500,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 homeHoldAppKeys.get(event.getKeyCode()))) return true;
         if (handleSettingsKey(event)) return true;
         if (holdOk(event)) return true;
+        if (heroKey(event)) return true;
         if (tileMenuEnabled && !reordering && openPopup == null && cardPrompt == null
                 && event.getKeyCode() == KeyEvent.KEYCODE_MENU) {
             int position = focusedTilePosition();
@@ -1494,6 +1558,43 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         return super.dispatchKeyEvent(event);   // arrows navigate; OK on a top-bar pill works as usual
     }
 
+    /**
+     * hero_pager: Up from the dock, or Down from the top bar, goes into the carousel. Inside it the carousel takes
+     * the keys itself (HeroPager) and hands focus back through heroHost.
+     */
+    private boolean heroKey(KeyEvent event) {
+        if (heroBridge == null || reordering || openPopup != null || cardPrompt != null || appLibrary != null) return false;
+        int code = event.getKeyCode();
+        if (code != KeyEvent.KEYCODE_DPAD_UP && code != KeyEvent.KEYCODE_DPAD_DOWN) return false;
+        if (heroBridge.hasFocus() || !heroBridge.hasSlides()) return false;
+        boolean into;
+        if (code == KeyEvent.KEYCODE_DPAD_UP) {
+            int pos = focusedTilePosition();
+            into = pos >= 0 && dockRow && DockSlots.inDockRow(dockRow, singleRow, pos, COLUMNS);
+        } else {
+            into = inTopBar(getCurrentFocus());
+        }
+        if (!into) return false;
+        if (event.getAction() == KeyEvent.ACTION_DOWN) heroBridge.requestFocus();
+        return true;
+    }
+
+    private void showHeroPager(boolean show) {
+        View pager = findViewById(R.id.heroPager);
+        float target = show ? 1f : 0f;
+        if (pager.getAlpha() == target) return;
+        pager.animate().cancel();
+        if (!animations || reducedMotion) pager.setAlpha(target);
+        else pager.animate().alpha(target).setDuration(show ? 320 : 200).start();
+    }
+
+    private static boolean inTopBar(View v) {
+        for (View p = v; p != null; p = p.getParent() instanceof View ? (View) p.getParent() : null) {
+            if (p.getId() == R.id.topButtons) return true;
+        }
+        return false;
+    }
+
     /** Adapter position of the focused tile, or -1 when focus is not on a tile. */
     private int focusedTilePosition() {
         View f = getCurrentFocus();
@@ -1543,6 +1644,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
      * to the grid; then OK on any tile swaps that app into the place, saves the order and ends the mode. Back goes
      * one step back: from choosing the app to choosing the place, and from there out of the mode.
      */
+    @SuppressLint("RestrictedApi")   // super.dispatchKeyEvent, as in dispatchKeyEvent
     private boolean dispatchDockEdit(KeyEvent event) {
         boolean down = event.getAction() == KeyEvent.ACTION_DOWN;
         int code = event.getKeyCode();
@@ -1767,6 +1869,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
     @Override
     @SuppressWarnings("deprecation")
+    @SuppressLint("MissingSuperCall")   // ComponentActivity's super finishes the activity: Home must never go away on Back
     public void onBackPressed() {
         // Home screen: Back goes nowhere, unless back_opens_clock is on.
         if (backOpensClock) startActivity(new Intent(this, ClockActivity.class));
@@ -1809,6 +1912,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     public void onTileFocused(int position, View card) {
         lastFocused = position;
         lastFocusedKey = adapter.keyAt(position);
+        // hero_pager: below the dock the grid scrolls the dock up over the carousel's text, so it steps aside there.
+        if (heroBridge != null) showHeroPager(DockSlots.inDockRow(dockRow, singleRow, position, COLUMNS));
         // Focus restored before the first layout (cold start): the tile has no size yet, and the glass
         // would be sized to 2*pad. Run again once the tile is laid out.
         if (card.getWidth() == 0) {

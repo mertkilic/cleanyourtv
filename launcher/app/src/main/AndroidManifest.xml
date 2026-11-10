@@ -8,6 +8,8 @@
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- hero_pager: the trending carousel fetches Trakt and TMDB (and TMDB's images) while Home is on screen. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- Needed since Android 10 to read the Wi-Fi network name for the network pill. Never requested at
          runtime: build-and-install grants it with pm grant, so lint's Android 12 "ask for COARSE with
@@ -68,6 +70,15 @@
         <!-- Coocaa OS sources for the Inputs menu (coocaa_sources); see CoocaaSources. -->
         <provider android:authorities="com.skyworth.tv.provider" />
         <provider android:authorities="com.skyworth.tv.sdk.provider" />
+        <!-- hero_pager: OK hands the slide's title to hero_pager_target's search (TiviMate by default). These make
+             its search activity, voice-search action and search provider visible under package visibility. -->
+        <package android:name="ar.tvplayer.tv" />
+        <intent>
+            <action android:name="android.intent.action.SEARCH" />
+        </intent>
+        <intent>
+            <action android:name="com.google.android.gms.actions.SEARCH_ACTION" />
+        </intent>
     </queries>
 
     <application
@@ -240,6 +251,18 @@
             </intent-filter>
         </receiver>
 
+        <service
+            android:name=".hero.SearchHandoffService"
+            android:exported="false"
+            android:label="@string/hero_search_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/search_handoff_service" />
+        </service>
         <service
             android:name=".InputKeyService"
             android:exported="false"

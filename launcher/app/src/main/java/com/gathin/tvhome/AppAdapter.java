@@ -110,11 +110,18 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         if (innerWidthPx <= 0 || columns <= 0) return design;
         int cell = innerWidthPx / columns;
         int fit = (int) ((cell - 12 * density) / FOCUS_SCALE);
-        return Math.max(Math.round(80 * density), Math.min(design, fit));
+        int w = Math.max(Math.round(80 * density), Math.min(design, fit));
+        return circleTiles ? w - Math.round(CIRCLE_SHRINK_DP * density) : w;
     }
 
+    /** Tile height over width: the banner's 101/180, or 1 with square_tiles (set by MainActivity before layout). */
+    static float tileAspect = DESIGN_H_DP / DESIGN_W_DP;
+    /** circle_tiles: round tiles (square ones with a half-width radius), 20dp smaller than the column allows. */
+    static boolean circleTiles;
+    static final float CIRCLE_SHRINK_DP = 20f;
+
     static int tileHeightPx(int tileWidthPx) {
-        return Math.round(tileWidthPx * DESIGN_H_DP / DESIGN_W_DP);
+        return Math.round(tileWidthPx * tileAspect);
     }
 
     /** Height of one grid item: the tile, the name label under it and the item's own padding. */
@@ -161,7 +168,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 : TOP_ROOM_DP + COMPACT_BOTTOM_ROOM_DP) * density;
         float perItem = (gridHeightPx - reserved) / (rowsBelowDock + 1);
         float tileH = perItem - (dockRow ? ITEM_EXTRA_DP : COMPACT_ITEM_EXTRA_DP) * density;
-        int byHeight = Math.round(tileH * DESIGN_W_DP / DESIGN_H_DP);
+        int byHeight = Math.round(tileH / tileAspect);
         // Shrink at most to MIN_HEIGHT_FIT of the width-only size. Below that the tiles look lost in their wide
         // columns (2 rows under a titled dock came out at 80dp); the rows that still don't fit run off the bottom
         // and scroll, and MainActivity keeps the title's room above the dock.
@@ -304,7 +311,7 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             }
             // The icon is only drawn (and sampled for the glow) when there is no banner, so a tile with a
             // banner skips loading and decoding it.
-            Drawable icon = banner == null ? ri.loadIcon(pm) : null;
+            Drawable icon = banner == null ? (uniformTiles ? sharpIcon(pm, ri) : ri.loadIcon(pm)) : null;
             if (card != null) {
                 fresh.add(new Entry(Entry.CARD, label, component, banner, icon, card.caption, card.accent));
             } else {
@@ -354,6 +361,23 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         icon.setBounds((w - side) / 2, (h - side) / 2, (w + side) / 2, (h + side) / 2);
         icon.draw(canvas);
         return new android.graphics.drawable.BitmapDrawable(ctx.getResources(), bmp);
+    }
+
+    /**
+     * uniform_tiles: the app's icon from its highest-density resources (xxxhdpi: 192 px, or 432 px for an adaptive
+     * icon), as loadIcon picks the TV's own density (xhdpi, 96 px) and a large centred mark on a 4K panel showed it.
+     */
+    private Drawable sharpIcon(PackageManager pm, ResolveInfo ri) {
+        int id = ri.getIconResource();
+        if (id != 0) {
+            try {
+                Resources res = pm.getResourcesForApplication(ri.activityInfo.applicationInfo);
+                Drawable d = res.getDrawableForDensity(id, DisplayMetrics.DENSITY_XXXHIGH, null);
+                if (d != null) return d;
+            } catch (PackageManager.NameNotFoundException | Resources.NotFoundException ignored) {
+            }
+        }
+        return ri.loadIcon(pm);
     }
 
     /** A banner_* drawable bundled with the launcher, or null for none or a name that is not one. */
@@ -897,6 +921,8 @@ public class AppAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     /** Corner radius for a tile of this width: 16dp at the design width, proportionally less when smaller. */
     static float cornerRadius(int tileWidthPx, float density) {
+        // circle_tiles: half the width, so the card's outline and the glass over it are circles.
+        if (circleTiles) return tileWidthPx / 2f;
         return 16f * density * Math.min(1f, tileWidthPx / (DESIGN_W_DP * density));
     }
 

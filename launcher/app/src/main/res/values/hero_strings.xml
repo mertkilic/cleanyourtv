@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hero carousel (hero_pager). English only for now: the other languages fall back to these (lint.xml). -->
+<resources>
+    <string name="hero_watching_now">%1$s watching now</string>
+    <string name="hero_trending_week">Trending this week</string>
+    <string name="hero_movie">Movie</string>
+    <string name="hero_series">Series</string>
+    <plurals name="hero_season_count">
+        <item quantity="one">%d season</item>
+        <item quantity="other">%d seasons</item>
+    </plurals>
+    <string name="hero_search_in">Search in %1$s</string>
+    <string name="hero_copied">\"%1$s\" copied. Paste it into the search in %2$s</string>
+    <string name="hero_not_installed">%1$s is not installed</string>
+    <string name="hero_attribution">Data: TMDB · Trakt</string>
+    <string name="hero_attribution_tmdb">Data: TMDB</string>
+    <string name="hero_search_service_label">Home: search in TiviMate</string>
+    <string name="hero_search_service_description">OK on a slide in Home\'s trending carousel opens TiviMate and types the title into its search. It reads TiviMate\'s screens only, and only for a few seconds after you press OK.</string>
+</resources>

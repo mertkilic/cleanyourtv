@@ -1,6 +1,17 @@
 plugins {
     id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'
+    id 'org.jetbrains.kotlin.plugin.serialization'
 }
+
+// hero_pager keys, from launcher/local.properties (gitignored), never from a committed file:
+//   tmdb.token=<TMDB v4 read access token, or a v3 API key>
+//   trakt.clientId=<Trakt API client id>          (optional: without it the carousel uses TMDB trending)
+def heroProps = new Properties()
+def heroPropsFile = rootProject.file('local.properties')
+if (heroPropsFile.exists()) heroPropsFile.withInputStream { heroProps.load(it) }
+def heroKey = { String name -> (heroProps.getProperty(name) ?: '').trim().replace('"', '') }
 
 android {
     namespace 'com.gathin.tvhome'
@@ -15,6 +26,8 @@ android {
         targetSdk 34
         versionCode 13
         versionName '3.4'
+        buildConfigField 'String', 'TMDB_TOKEN', "\"${heroKey('tmdb.token')}\""
+        buildConfigField 'String', 'TRAKT_CLIENT_ID', "\"${heroKey('trakt.clientId')}\""
     }
 
     buildTypes {
@@ -30,9 +43,9 @@ android {
 
     packagingOptions {
         resources {
-            // Kotlin metadata pulled in by AndroidX's dependencies. This launcher is plain Java and never reads it;
-            // leaving it out saves about 14 KB of every install.
-            excludes += ['kotlin/**', 'META-INF/*.version', 'META-INF/*.kotlin_module', 'DebugProbesKt.bin']
+            // The hero carousel is Kotlin, so the Kotlin metadata stays in; only the version stamps and the coroutines
+            // debug probes are left out.
+            excludes += ['META-INF/*.version', 'DebugProbesKt.bin']
         }
     }
 
@@ -40,11 +53,38 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    buildFeatures {
+        compose true
+        buildConfig true
+    }
 }
 
 dependencies {
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
     implementation 'androidx.dynamicanimation:dynamicanimation:1.0.0'
+
+    // hero_pager: Compose carousel, Coil images, Retrofit + kotlinx.serialization, Palette, WorkManager.
+    // Versions are the last ones that build against compileSdk 34.
+    implementation platform('androidx.compose:compose-bom:2024.09.03')
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.activity:activity-compose:1.9.2'
+    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.8.6'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.6'
+    implementation 'io.coil-kt:coil-compose:2.7.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.retrofit2:retrofit:2.11.0'
+    implementation 'com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
+    implementation 'androidx.palette:palette-ktx:1.0.0'
+    implementation 'androidx.work:work-runtime-ktx:2.9.1'
     // Test only (never in the APK): plain JVM tests for the module card validators, src/test.
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1'
 }

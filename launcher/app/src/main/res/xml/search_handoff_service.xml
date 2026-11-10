@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- hero_pager: OK on a slide opens TiviMate and this helper puts the title into TiviMate's search field
+     (hero/SearchHandoffService.kt). Events and window content from TiviMate only (packageNames), and the
+     service does nothing unless a search was asked for in the last few seconds. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:packageNames="ar.tvplayer.tv"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagIncludeNotImportantViews"
+    android:canRetrieveWindowContent="true"
+    android:notificationTimeout="150"
+    android:description="@string/hero_search_service_description" />

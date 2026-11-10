@@ -30,6 +30,14 @@
         android:layout_height="match_parent"
         android:alpha="0" />
 
+    <!-- Hero carousel (hero_pager): trending movies and series behind the header, above the dock and over the ambient glow. Gone until it
+         has slides. Compose for TV, see hero/HeroBridge.kt. -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/heroPager"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
     <!-- Race-weekend panel (a theme's race_calendar, see RaceWeekend): in the free space under the clock,
          shown only from shortly before a weekend's first session until the race is over. Updated once a
          minute with the clock, never animated. -->

@@ -310,7 +310,7 @@
          also be set with "dock_glass": true in a theme's config.json. -->
     <bool name="dock_glass">false</bool>
     <!-- Draw the dock band and its edge. false leaves the tiles floating on the wallpaper (config.xml dock_band). -->
-    <bool name="dock_band">true</bool>
+    <bool name="dock_band">false</bool>
     <!-- Every app in one row: the dock apps first, the rest after them, and the row scrolls sideways when focus
          reaches its edge. No grid below; rows_below_dock is ignored. Needs dock_row. Can also be set with
          "single_row" in a theme. -->
@@ -409,7 +409,7 @@
 
     <!-- Tiles per row in the grid; the dock always has this many slots. Tiles are 180dp wide at 4 columns and
          shrink to fit from 5 up (about 144dp at 5, 117dp at 6 on a 1080p TV). -->
-    <integer name="columns">4</integer>
+    <integer name="columns">6</integer>
 
     <!-- Basic motion is on; advanced effects are opt-in in the launcher's own Settings screen. -->
     <bool name="animations">true</bool>
@@ -423,7 +423,15 @@
     <bool name="app_library">false</bool>
     <!-- Every app tile is its icon on a card tinted from that icon, name only under the focused tile,
          instead of each app's own banner. Off by default; a theme can set "uniform_tiles": true. -->
-    <bool name="uniform_tiles">false</bool>
+    <bool name="uniform_tiles">true</bool>
+    <!-- Square tiles instead of 16:9 ones; with uniform_tiles each is the app's icon (loaded at xxxhdpi) on a square
+         card tinted from it, like a phone's home screen. -->
+    <bool name="square_tiles">true</bool>
+    <!-- Round tiles (the focus glass follows), 20dp smaller than square ones. Implies square_tiles. -->
+    <bool name="circle_tiles">true</bool>
+    <!-- The dock band's opacity in percent, 30 to 100 (100: solid). Below 100 the carousel and the wallpaper show
+         through. A theme's "dock_opacity" or the launcher's Settings choice overrides it. -->
+    <integer name="dock_opacity">50</integer>
     <!-- Optional direct Home picker in the app library: OK toggles the checkmark, checked apps first.
          Off by default; a theme can set "app_library_selection": true (also needs app_library). -->
     <bool name="app_library_selection">false</bool>
@@ -552,4 +560,16 @@
     <!-- Tiles drawn from the app's icon and name instead of its banner (for banners that crop badly). -->
     <string-array name="icon_tiles" translatable="false">
     </string-array>
+
+    <!-- Hero carousel (feature/hero-pager): the movies and series people are watching now (Trakt, with TMDB's
+         artwork; TMDB trending without a Trakt key) across the top of Home. OK on a slide searches for its title in
+         hero_pager_target. Needs tmdb.token (and optionally trakt.clientId) in launcher/local.properties; with no
+         token, or nothing fetched yet and no network, Home looks as before. Turns cinematic_home off. -->
+    <bool name="hero_pager">true</bool>
+    <!-- Seconds each slide stays before the next one, 4 to 60. -->
+    <integer name="hero_pager_seconds">8</integer>
+    <!-- TMDB language for titles, overviews and logos, e.g. en-US, tr-TR, de-DE. -->
+    <string name="hero_pager_language" translatable="false">en-US</string>
+    <!-- The app OK hands the title to (its search). TiviMate: ar.tvplayer.tv. -->
+    <string name="hero_pager_target" translatable="false">ar.tvplayer.tv</string>
 </resources>

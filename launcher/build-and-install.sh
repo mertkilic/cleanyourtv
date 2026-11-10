@@ -235,6 +235,9 @@ enable_service() {   # appends to enabled_accessibility_services without droppin
 }
 if [ "${INPUT_KEY_SERVICE:-0}" = 1 ]; then enable_service InputKeyService; fi
 if [ "${HOME_KEY_SERVICE:-0}" = 1 ]; then enable_service HomeKeyService; fi
+# SEARCH_HANDOFF_SERVICE=1  hero_pager: OK on a carousel slide opens TiviMate and types the title into its search
+#                           (hero/SearchHandoffService.kt). Reads TiviMate's screens only, for a few seconds after OK.
+if [ "${SEARCH_HANDOFF_SERVICE:-0}" = 1 ]; then enable_service hero.SearchHandoffService; fi
 # The grant follows the switch on every install: pm install -r keeps a grant, so a run without the switch takes it
 # back. WRITE_SECURE_SETTINGS opens every secure and global setting, not only the accessibility list.
 # tv.py does not hand back the TV shell's exit status, so each side prints its marker only once dumpsys shows the
