@@ -11,6 +11,11 @@
 
 ## What this fork adds
 
+<p align="center">
+  <img src="docs/fork/odyssey.jpg" alt="Home with the trending carousel on The Odyssey (2026): the backdrop behind the clock and the pills, the title logo, year, rating, genres and overview, a Search in TiviMate button with the slide dots, and round app icons below, with the artwork fading into the poster's own colour." width="800">
+  <br><sub>Sony BRAVIA 4K AE2, Google TV 14: the carousel selected on The Odyssey, round icon tiles in the dock.</sub>
+</p>
+
 | Change | What it does | Setting (`launcher/app/src/main/res/values/config.xml`) |
 |---|---|---|
 | **Trending carousel** | A full-width slideshow above the dock with the movies and series people are watching now: backdrop, title logo, year, rating, genres, overview. Up from the dock selects it; Left/Right flip, Down returns. The artwork fades under the app icons into the poster's own average colour. | `hero_pager`, `hero_pager_seconds` (8), `hero_pager_language` (`en-US`) |
