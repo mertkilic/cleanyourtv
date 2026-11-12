@@ -32,6 +32,39 @@ class HeroFeedTest {
         assertEquals(listOf("movie:1", "tv:1", "movie:2"), out.map { "${it.type}:${it.tmdbId}" })
     }
 
+    private fun slide(id: Int, type: String = TYPE_MOVIE) = Slide(tmdbId = id, type = type, title = "T$id", backdropPath = "/$id.jpg")
+
+    @Test
+    fun watchedTitlesGiveTheirPlaceToTheNextOfTheFeed() {
+        val pool = (1..5).map { slide(it) } + slide(1, TYPE_TV)
+        assertEquals(listOf("movie:1", "movie:2", "movie:3"), HeroFeed.visible(pool, emptySet(), max = 3).map { it.key })
+        // The series with the same TMDB id as a watched movie is another title and stays.
+        assertEquals(
+            listOf("movie:3", "movie:5", "tv:1"),
+            HeroFeed.visible(pool, setOf("movie:1", "movie:2", "movie:4"), max = 3).map { it.key },
+        )
+        assertTrue(HeroFeed.visible(pool, pool.map { it.key }.toSet()).isEmpty())
+    }
+
+    @Test
+    fun trailerPrefersAnOfficialYoutubeTrailerInTheSlidesLanguage() {
+        fun v(key: String, type: String = "Trailer", site: String = "YouTube", lang: String = "en", official: Boolean = true, at: String = "2026-01-01") =
+            TmdbVideo(key, site, type, official, lang, at)
+        val videos = listOf(
+            v("teaser", type = "Teaser"),
+            v("vimeo", site = "Vimeo"),
+            v("fan", official = false, lang = "de"),
+            v("en-old", at = "2025-01-01"),
+            v("en-new", at = "2026-06-01"),
+            v("de-official", lang = "de"),
+            v("clip", type = "Clip"),
+        )
+        assertEquals("de-official", HeroFeed.pickTrailer(videos, "de-DE"))
+        assertEquals("en-new", HeroFeed.pickTrailer(videos, "en-US"))
+        assertEquals("teaser", HeroFeed.pickTrailer(listOf(v("teaser", type = "Teaser"), v("clip", type = "Clip")), "en-US"))
+        assertNull(HeroFeed.pickTrailer(listOf(v("vimeo", site = "Vimeo"), v("blank").copy(key = "")), "en-US"))
+    }
+
     @Test
     fun traktRowsWithoutATmdbIdAreSkipped() {
         val out = HeroFeed.fromTrakt(
@@ -96,8 +129,11 @@ class HeroFeedTest {
     fun staleOnlyOnAnotherDay() {
         val utc = ZoneOffset.UTC
         val morning = Instant.parse("2026-11-10T06:00:00Z").toEpochMilli()
-        val feed = Feed(fetchedAtMs = morning, language = "en-US", source = SOURCE_TRAKT, slides = emptyList())
+        val feed = Feed(fetchedAtMs = morning, language = "en-US", source = SOURCE_TRAKT, slides = emptyList(), version = HeroFeed.FEED_VERSION)
         assertFalse(HeroFeed.isStale(feed, Instant.parse("2026-11-10T23:59:59Z").toEpochMilli(), "en-US", utc))
+        // A feed saved before trailers and runtimes (no version in the file) is fetched again the same day.
+        val old = heroJson.decodeFromString(Feed.serializer(), """{"fetchedAtMs":$morning,"language":"en-US","source":"trakt","slides":[]}""")
+        assertTrue(HeroFeed.isStale(old, morning + 1, "en-US", utc))
         assertTrue(HeroFeed.isStale(feed, Instant.parse("2026-11-11T00:00:00Z").toEpochMilli(), "en-US", utc))
         assertTrue(HeroFeed.isStale(feed, Instant.parse("2026-11-09T23:00:00Z").toEpochMilli(), "en-US", utc)) // clock back
         assertTrue(HeroFeed.isStale(feed, morning + 1, "tr-TR", utc))                                           // language
@@ -112,6 +148,9 @@ class HeroFeedTest {
         assertFalse(HeroFeed.mayAttempt(1_000, 1_000 + HeroFeed.RETRY_AFTER_MS - 1))
         assertTrue(HeroFeed.mayAttempt(1_000, 1_000 + HeroFeed.RETRY_AFTER_MS))
         assertTrue(HeroFeed.mayAttempt(5_000, 1_000))   // clock set back
+        // The last attempt brought the feed on hand (fetched at 1_200): no wait, a failed one (feed older) waits.
+        assertTrue(HeroFeed.mayAttempt(1_000, 1_000 + 60_000, fetchedAtMs = 1_200))
+        assertFalse(HeroFeed.mayAttempt(1_000, 1_000 + 60_000, fetchedAtMs = 500))
     }
 
     @Test
@@ -132,7 +171,7 @@ class HeroFeedTest {
             return TmdbPage(listOf(TmdbTrendingItem(21, TYPE_MOVIE, backdropPath = "/t.jpg")))
         }
 
-        override suspend fun details(type: String, id: Int, language: String, append: String, imageLanguages: String): TmdbDetails {
+        override suspend fun details(type: String, id: Int, language: String, append: String, imageLanguages: String, videoLanguages: String): TmdbDetails {
             detailCalls++
             if (id in failIds) throw RuntimeException("404")
             return TmdbDetails(id = id, title = "M$id", name = "S$id", backdropPath = "/$id.jpg")

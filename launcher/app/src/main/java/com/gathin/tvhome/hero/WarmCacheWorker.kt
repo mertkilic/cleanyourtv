@@ -27,7 +27,9 @@ class WarmCacheWorker(context: Context, params: WorkerParameters) : CoroutineWor
         // No retry() on failure: WorkManager would call again within minutes; the next run (or Home) tries later.
         val feed = repo.cached() ?: return Result.success()
         val loader = HeroNet.imageLoader(applicationContext)
-        for (s in feed.slides) {
+        // The carousel's titles and the ones that stand in when a title is marked as watched.
+        val watched = WatchedStore(applicationContext).keys()
+        for (s in HeroFeed.visible(feed.slides, watched, HeroFeed.CANDIDATES)) {
             val urls = listOfNotNull(
                 HeroFeed.imageUrl(s.backdropPath, HeroUi.BACKDROP_SIZE),
                 s.logoPath?.let { HeroFeed.imageUrl(it, HeroUi.LOGO_SIZE) },

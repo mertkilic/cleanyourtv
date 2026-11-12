@@ -12,14 +12,15 @@ interface TmdbApi {
         @Query("language") language: String,
     ): TmdbPage
 
-    /** Details plus logos and backdrops in one call. */
+    /** Details plus logos, backdrops and videos (for the trailer) in one call. */
     @GET("{type}/{id}")
     suspend fun details(
         @Path("type") type: String,
         @Path("id") id: Int,
         @Query("language") language: String,
-        @Query("append_to_response") append: String = "images",
+        @Query("append_to_response") append: String = "images,videos",
         @Query("include_image_language") imageLanguages: String,
+        @Query("include_video_language") videoLanguages: String,
     ): TmdbDetails
 }
 

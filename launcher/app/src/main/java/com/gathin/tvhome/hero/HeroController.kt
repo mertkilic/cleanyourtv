@@ -20,6 +20,7 @@ class HeroController(
     private val context: Context,
     private val repo: HeroRepository,
     val imageLoader: ImageLoader,
+    private val watched: WatchedStore,
 ) {
     var slides by mutableStateOf<List<Slide>>(emptyList())
         private set
@@ -31,6 +32,13 @@ class HeroController(
 
     /** Slide key to ARGB: the backdrop's average colour, darkened; what the artwork fades into under the dock. */
     val bases = mutableStateMapOf<String, Int>()
+
+    /** [Slide.key]s marked as watched. The open card's button changes it at once; [slides] follows when it closes. */
+    var watchedKeys by mutableStateOf<Set<String>>(emptySet())
+        private set
+
+    /** The whole day's feed; [slides] is its first [HeroFeed.SLIDES] titles that were not marked as watched. */
+    private var pool: List<Slide> = emptyList()
 
     /** fetchedAtMs of the feed on screen, so a feed the worker saved meanwhile replaces it on the next visit. */
     private var shownAt = -1L
@@ -46,9 +54,42 @@ class HeroController(
 
     private suspend fun show(feed: Feed) {
         shownAt = feed.fetchedAtMs
-        slides = feed.slides
+        pool = feed.slides
         source = feed.source
-        for (s in feed.slides) {
+        watchedKeys = withContext(Dispatchers.IO) { watched.keys() }
+        slides = HeroFeed.visible(pool, watchedKeys)
+        paint(slides)
+    }
+
+    /**
+     * Marks the title as watched: it leaves the carousel for good and the next title of the day's feed takes the
+     * last place. No fetch; when the feed has no titles left, the carousel goes away until tomorrow's feed.
+     */
+    suspend fun markWatched(slide: Slide) {
+        setWatched(watchedKeys + slide.key)
+        applyWatched()
+    }
+
+    /** The open card's button: marks the title or takes the mark back. The carousel changes when the card closes. */
+    suspend fun toggleWatched(slide: Slide) {
+        setWatched(if (slide.key in watchedKeys) watchedKeys - slide.key else watchedKeys + slide.key)
+    }
+
+    /** The carousel without the titles marked as watched, the next ones of the day's feed taking their places. */
+    suspend fun applyWatched() {
+        val next = HeroFeed.visible(pool, watchedKeys)
+        if (next.map { it.key } == slides.map { it.key }) return
+        slides = next
+        paint(next)
+    }
+
+    private suspend fun setWatched(keys: Set<String>) {
+        watchedKeys = keys
+        withContext(Dispatchers.IO) { watched.save(keys) }
+    }
+
+    private suspend fun paint(list: List<Slide>) {
+        for (s in list) {
             if (s.key in accents) continue
             colours(s)?.let { (accent, base) ->
                 accents[s.key] = accent

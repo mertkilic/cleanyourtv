@@ -7,8 +7,13 @@ import java.util.Locale
 /** The pure half of the feed: ranking, filtering and picking artwork. No Android, no network (unit-tested). */
 object HeroFeed {
     const val SLIDES = 10
-    /** More candidates than slides, so titles dropped for missing artwork still leave a full carousel. */
-    const val CANDIDATES = 14
+    /** Raised when a saved feed lacks what the carousel now shows (2: trailers, runtimes); an older one is refetched. */
+    const val FEED_VERSION = 2
+    /**
+     * More candidates than slides. All of them are kept in the day's feed, so titles dropped for missing artwork
+     * still leave a full carousel, and a title marked as watched gives its place to the next one without a fetch.
+     */
+    const val CANDIDATES = 20
     /** After a fetch that brought nothing (offline, TMDB down), the next try waits this long, not the next Home. */
     const val RETRY_AFTER_MS = 60L * 60 * 1000
 
@@ -48,6 +53,10 @@ object HeroFeed {
         .distinctBy { "${it.type}:${it.tmdbId}" }
         .take(max)
 
+    /** What the carousel shows from the day's feed: the first [max] titles, in its order, that were not watched. */
+    fun visible(pool: List<Slide>, watched: Set<String>, max: Int = SLIDES): List<Slide> =
+        pool.asSequence().filter { it.key !in watched }.take(max).toList()
+
     /** The slide for a title's details, or null when it is adult, untitled or has no backdrop. */
     fun toSlide(c: Candidate, d: TmdbDetails, language: String): Slide? {
         if (d.adult) return null
@@ -67,6 +76,9 @@ object HeroFeed {
             logoPath = pickLogo(d.images?.logos.orEmpty(), language),
             watchers = c.watchers,
             seasons = if (c.type == TYPE_TV) d.numberOfSeasons?.takeIf { it > 0 } else null,
+            runtime = (if (c.type == TYPE_TV) d.episodeRunTime.firstOrNull() ?: d.lastEpisode?.runtime else d.runtime)
+                ?.takeIf { it > 0 },
+            trailerKey = pickTrailer(d.videos?.results.orEmpty(), language),
         )
     }
 
@@ -81,6 +93,27 @@ object HeroFeed {
         return textless?.filePath ?: d.backdropPath?.takeIf { it.isNotBlank() }
     }
 
+    /**
+     * A YouTube trailer (a teaser when there is no trailer): the slide's language before English, official before
+     * not, the newest first. Null when there is none, and the expanded card then has no trailer button.
+     */
+    fun pickTrailer(videos: List<TmdbVideo>, language: String): String? {
+        val lang = language.substringBefore('-').lowercase(Locale.ROOT)
+        return videos
+            .filter { it.site.equals("YouTube", ignoreCase = true) && VIDEO_KEY.matches(it.key) && it.type in TRAILER_TYPES }
+            .sortedWith(
+                compareBy<TmdbVideo> { TRAILER_TYPES.indexOf(it.type) }
+                    .thenBy { if (it.language == lang) 0 else 1 }
+                    .thenBy { if (it.official) 0 else 1 }
+                    .thenByDescending { it.publishedAt.orEmpty() }
+            )
+            .firstOrNull()?.key
+    }
+
+    private val TRAILER_TYPES = listOf("Trailer", "Teaser")
+    /** A YouTube id, checked because it goes into the URL the trailer opens. */
+    private val VIDEO_KEY = Regex("[A-Za-z0-9_-]+")
+
     /** A PNG logo in the slide's language, else English, else any; the best voted in that group. SVG is skipped. */
     fun pickLogo(logos: List<TmdbImage>, language: String): String? {
         val usable = logos.filter { it.filePath.endsWith(".png", ignoreCase = true) }
@@ -93,14 +126,21 @@ object HeroFeed {
 
     /**
      * One fetch per calendar day on the TV's clock: the feed is stale once the local date is no longer the date it
-     * was fetched on (or the language changed). A clock set backwards also reads as another day.
+     * was fetched on (or the language changed, or the feed was saved in an older format). A clock set backwards also
+     * reads as another day.
      */
     fun isStale(feed: Feed?, nowMs: Long, language: String, zone: ZoneId = ZoneId.systemDefault()): Boolean =
-        feed == null || feed.language != language || day(feed.fetchedAtMs, zone) != day(nowMs, zone)
+        feed == null || feed.version < FEED_VERSION || feed.language != language ||
+            day(feed.fetchedAtMs, zone) != day(nowMs, zone)
 
-    /** Whether a fetch may start now, given when the last one started (null: never). */
-    fun mayAttempt(lastAttemptMs: Long?, nowMs: Long): Boolean =
-        lastAttemptMs == null || nowMs - lastAttemptMs !in 0 until RETRY_AFTER_MS
+    /**
+     * Whether a fetch may start now, given when the last one started (null: never) and when the saved feed was
+     * fetched. The wait is for a fetch that failed; one that saved the feed on hand (it started before that feed was
+     * fetched) holds nothing back, so a feed stale only for its format is fetched again at once.
+     */
+    fun mayAttempt(lastAttemptMs: Long?, nowMs: Long, fetchedAtMs: Long? = null): Boolean =
+        lastAttemptMs == null || (fetchedAtMs != null && lastAttemptMs <= fetchedAtMs) ||
+            nowMs - lastAttemptMs !in 0 until RETRY_AFTER_MS
 
     private fun day(ms: Long, zone: ZoneId) = Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
 

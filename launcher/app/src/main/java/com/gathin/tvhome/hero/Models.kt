@@ -24,6 +24,10 @@ data class Slide(
     /** Trakt's people watching right now; null when the feed came from TMDB. */
     val watchers: Int? = null,
     val seasons: Int? = null,
+    /** Minutes: a movie's runtime, a series' episode length; null when TMDB has none. */
+    val runtime: Int? = null,
+    /** A YouTube video id for the title's trailer; null when TMDB has none (feeds cached before trailers, too). */
+    val trailerKey: String? = null,
 ) {
     val isSeries: Boolean get() = type == TYPE_TV
     val key: String get() = "$type:$tmdbId"
@@ -35,6 +39,8 @@ data class Feed(
     val language: String,
     val source: String,
     val slides: List<Slide>,
+    /** [HeroFeed.FEED_VERSION] when saved; files from before the field read as 1. */
+    val version: Int = 1,
 )
 
 /** A title to look up on TMDB, in the order it should appear. */
@@ -72,7 +78,27 @@ data class TmdbDetails(
     val genres: List<TmdbGenre> = emptyList(),
     @SerialName("backdrop_path") val backdropPath: String? = null,
     @SerialName("number_of_seasons") val numberOfSeasons: Int? = null,
+    val runtime: Int? = null,
+    @SerialName("episode_run_time") val episodeRunTime: List<Int> = emptyList(),
+    @SerialName("last_episode_to_air") val lastEpisode: TmdbEpisode? = null,
     val images: TmdbImages? = null,
+    val videos: TmdbVideos? = null,
+)
+
+@Serializable
+data class TmdbEpisode(val runtime: Int? = null)
+
+@Serializable
+data class TmdbVideos(val results: List<TmdbVideo> = emptyList())
+
+@Serializable
+data class TmdbVideo(
+    val key: String = "",
+    val site: String = "",
+    val type: String = "",
+    val official: Boolean = false,
+    @SerialName("iso_639_1") val language: String? = null,
+    @SerialName("published_at") val publishedAt: String? = null,
 )
 
 @Serializable

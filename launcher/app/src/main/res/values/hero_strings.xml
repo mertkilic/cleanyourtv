@@ -12,8 +12,13 @@
     <string name="hero_search_in">Search in %1$s</string>
     <string name="hero_copied">\"%1$s\" copied. Paste it into the search in %2$s</string>
     <string name="hero_not_installed">%1$s is not installed</string>
-    <string name="hero_attribution">Data: TMDB · Trakt</string>
-    <string name="hero_attribution_tmdb">Data: TMDB</string>
+    <string name="hero_watch_trailer">Watch trailer</string>
+    <string name="hero_mark_watched">Mark as watched</string>
+    <string name="hero_watched">Watched</string>
+    <string name="hero_no_trailer_app">No app on this TV can play the trailer</string>
+    <string name="hero_runtime_hm">%1$dh %2$02dm</string>
+    <string name="hero_runtime_m">%1$d min</string>
+    <string name="hero_marked_watched">\"%1$s\" marked as watched</string>
     <string name="hero_search_service_label">Home: search in TiviMate</string>
     <string name="hero_search_service_description">OK on a slide in Home\'s trending carousel opens TiviMate and types the title into its search. It reads TiviMate\'s screens only, and only for a few seconds after you press OK.</string>
 </resources>

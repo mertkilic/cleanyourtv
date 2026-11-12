@@ -208,6 +208,8 @@ public class MainActivity extends ComponentActivity implements AppAdapter.TileLi
     private GameDay gameDay;
     /** hero_pager: the trending carousel above the dock, or null when it is off or has no TMDB token. */
     private HeroBridge heroBridge;
+    /** Top of the dock row in root's coordinates, for how far the open carousel card slides the grid down. */
+    private int heroDockTop;
     /** dock_title, kept so the app name above the dock comes back if the carousel goes away. */
     private boolean dockTitleShown = true;
     private final HeroBridge.Host heroHost = new HeroBridge.Host() {
@@ -241,6 +243,19 @@ public class MainActivity extends ComponentActivity implements AppAdapter.TileLi
         public void heroShown(boolean shown) {
             // The carousel's title block sits where the focused app's name would: one or the other.
             if (dockTitleShown) hero.setVisibility(shown ? View.GONE : View.VISIBLE);
+            // The first call comes from attach(), before onCreate has found the grid.
+            if (!shown && grid != null) {
+                grid.animate().cancel();
+                grid.setTranslationY(0f);
+                grid.setAlpha(1f);
+            }
+        }
+
+        @Override
+        public void heroDockShift(float px) {
+            // The open card's actions sit above the dock: the grid moves down by just what they need, frame by frame
+            // with the card's own motion (a translation: no layout).
+            if (grid != null) grid.setTranslationY(px);
         }
     };
     private View raceBar;
@@ -758,6 +773,7 @@ public class MainActivity extends ComponentActivity implements AppAdapter.TileLi
             final Runnable measureDock = () -> {
                 dockLine.set(0, grid.getPaddingTop(), 1, grid.getPaddingTop() + 1);
                 root.offsetDescendantRectToMyCoords(grid, dockLine);
+                heroDockTop = dockLine.top;
                 heroBridge.setDockTop(dockLine.top);
             };
             grid.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> grid.post(measureDock));

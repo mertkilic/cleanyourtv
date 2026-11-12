@@ -1,6 +1,7 @@
 package com.gathin.tvhome.hero
 
 import android.view.View
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -40,6 +41,9 @@ class HeroBridge private constructor(
 
         /** The carousel appeared (it has slides) or went away. */
         fun heroShown(shown: Boolean)
+
+        /** How far down (px) the dock and the grid move to make room for the open card; 0 when it is closed. */
+        fun heroDockShift(px: Float)
     }
 
     internal data class Settings(
@@ -84,6 +88,33 @@ class HeroBridge private constructor(
 
     internal fun select(slide: Slide) {
         activity.lifecycleScope.launch { TiviMateHandoff.search(activity, settings.target, slide.title) }
+    }
+
+    /** The card opened or closed. Closing takes the titles marked as watched out of the carousel. */
+    internal fun expanded(open: Boolean) {
+        if (open) return
+        activity.lifecycleScope.launch {
+            controller.applyWatched()
+            if (controller.slides.isEmpty() && view.hasFocus()) host.heroExitDown()
+        }
+    }
+
+    internal fun toggleWatched(slide: Slide) {
+        activity.lifecycleScope.launch { controller.toggleWatched(slide) }
+    }
+
+    internal fun playTrailer(slide: Slide) {
+        slide.trailerKey?.let { TrailerHandoff.open(activity, it) }
+    }
+
+    /** Long press of OK: the title leaves the carousel for good, and the next one of the day's feed comes in. */
+    internal fun markWatched(slide: Slide) {
+        activity.lifecycleScope.launch {
+            controller.markWatched(slide)
+            Toast.makeText(activity, activity.getString(R.string.hero_marked_watched, slide.title), Toast.LENGTH_SHORT).show()
+            // The last title gone: the carousel hides, so focus goes back to the dock before it does.
+            if (controller.slides.isEmpty() && view.hasFocus()) host.heroExitDown()
+        }
     }
 
     private fun start() {
@@ -132,6 +163,7 @@ class HeroBridge private constructor(
                 activity.applicationContext,
                 HeroNet.repository(activity, language),
                 HeroNet.imageLoader(activity),
+                WatchedStore(activity),
             )
             return HeroBridge(activity, view, host, settings, controller).also { it.start() }
         }

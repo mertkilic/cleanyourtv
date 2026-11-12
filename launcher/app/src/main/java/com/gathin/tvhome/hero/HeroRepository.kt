@@ -47,8 +47,9 @@ class HeroRepository(
     suspend fun refreshIfDue(): Feed? = LOCK.withLock {
         withContext(Dispatchers.IO) {
             val now = clock()
-            if (!HeroFeed.isStale(cached(), now, language, zone())) return@withContext null
-            if (!HeroFeed.mayAttempt(lastAttempt(), now)) return@withContext null
+            val feed = cached()
+            if (!HeroFeed.isStale(feed, now, language, zone())) return@withContext null
+            if (!HeroFeed.mayAttempt(lastAttempt(), now, feed?.fetchedAtMs)) return@withContext null
             markAttempt(now)
             refresh()
         }
@@ -78,7 +79,7 @@ class HeroRepository(
         }
         val slides = details(candidates)
         if (slides.isEmpty()) return@withContext null
-        val feed = Feed(clock(), language, source, slides)
+        val feed = Feed(clock(), language, source, slides, HeroFeed.FEED_VERSION)
         save(feed)
         feed
     }
@@ -89,19 +90,23 @@ class HeroRepository(
         HeroFeed.fromTrakt(movies.await(), shows.await())
     }
 
-    /** Up to four lookups at a time, in the candidates' order; titles that fail or have no backdrop are dropped. */
+    /**
+     * Up to four lookups at a time, in the candidates' order; titles that fail or have no backdrop are dropped. All
+     * are kept, not only the first [HeroFeed.SLIDES]: the rest stand in for titles marked as watched.
+     */
     private suspend fun details(candidates: List<Candidate>): List<Slide> = coroutineScope {
         val gate = Semaphore(4)
         val imageLanguages = "${language.substringBefore('-')},en,null"
+        val videoLanguages = "${language.substringBefore('-')},en"
         candidates.map { c ->
             async {
                 gate.withPermit {
                     attempt("tmdb ${c.type} ${c.tmdbId}") {
-                        HeroFeed.toSlide(c, tmdb.details(c.type, c.tmdbId, language, imageLanguages = imageLanguages), language)
+                        HeroFeed.toSlide(c, tmdb.details(c.type, c.tmdbId, language, imageLanguages = imageLanguages, videoLanguages = videoLanguages), language)
                     }
                 }
             }
-        }.awaitAll().filterNotNull().take(HeroFeed.SLIDES)
+        }.awaitAll().filterNotNull()
     }
 
     private fun save(feed: Feed) {
