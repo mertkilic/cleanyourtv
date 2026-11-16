@@ -51,9 +51,25 @@ TV_HOST=<tv ip> SEARCH_HANDOFF_SERVICE=1 ./build-and-install.sh
 ```
 
 On a set whose only network ADB is Wireless debugging, pair once with Google's `adb` and add
-`TV_ADB_BINARY=$(which adb) TV_HOST=<tv ip>:<port>` ([tools/native-adb.md](tools/native-adb.md)). Android turns
-accessibility helpers off whenever the launcher is reinstalled or force-stopped; run the install with
-`SEARCH_HANDOFF_SERVICE=1` again, or switch on "Home: search in TiviMate" in Settings > Accessibility.
+`TV_ADB_BINARY=$(which adb) TV_HOST=<tv ip>:<port>` ([tools/native-adb.md](tools/native-adb.md)).
+
+### Search in TiviMate stopped typing the title?
+
+TiviMate has no search intent, so a small accessibility helper in the launcher types the title into TiviMate's
+search for it. Android switches that helper off whenever the launcher is reinstalled or force-stopped, and the button
+then only opens TiviMate with the title on the clipboard. Switch it back on in one of these ways:
+
+- **Remote:** Settings > System > Accessibility > "Home: search in TiviMate" > on.
+- **Install script:** run the install with `SEARCH_HANDOFF_SERVICE=1`, as above.
+- **ADB:**
+
+  ```bash
+  adb -s <tv ip>:<port> shell settings put secure enabled_accessibility_services com.gathin.tvhome/com.gathin.tvhome.hero.SearchHandoffService
+  adb -s <tv ip>:<port> shell settings put secure accessibility_enabled 1
+  ```
+
+  This replaces the whole list. To keep the remote-key helper on too, add
+  `:com.gathin.tvhome/com.gathin.tvhome.InputKeyService` to the end of the first command's value.
 
 **Sony BRAVIA on Google TV 14:** the setup wizard (`com.google.android.tungsten.setupwraith`) also claims Home, so
 disable it before the stock launcher, as [examples/sony-bravia-ae2](examples/sony-bravia-ae2/debloat.txt) says. First
